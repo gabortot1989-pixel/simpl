@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir‑EC — Three.js (Netlify v4)</title>
+  <title>SimplAir‑EC — Three.js (Netlify v5, Ghost‑fix)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{height:100%;margin:0;background:#0b0e14;color:var(--text);font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow:hidden}
@@ -12,11 +12,13 @@
     header h1{font-size:16px;margin:0}
     #viewer{position:relative}
     canvas{display:block}
-    .panel{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:#0e1219;border-top:1px solid #131a26}
-    .group{display:flex;gap:8px;align-items:center;background:#0f141c;padding:8px 10px;border-radius:10px;border:1px solid #1f2937}
+    .panel{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;padding:10px 12px;background:#0e1219;border-top:1px solid #131a26}
+    .group{display:flex;flex-direction:column;gap:8px;background:#0f141c;padding:10px;border-radius:10px;border:1px solid #1f2937;min-width:320px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     select,button{background:#0e1420;color:#d5dde8;border:1px solid #223;padding:6px 8px;border-radius:8px;cursor:pointer}
     #hud{position:absolute;top:10px;right:10px;background:#14213a;border:1px solid #26416b;color:#dbeafe;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:72ch}
     #err{position:absolute;bottom:10px;right:10px;background:#3a1414;border:1px solid #6b2626;color:#ffd6d6;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:60ch;display:none}
+    ul{margin:0;padding-left:18px;max-height:160px;overflow:auto}
   </style>
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.152.2/build/three.module.js" } }
@@ -25,7 +27,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v4</span>
+    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v5 • Ghost‑fix</span>
   </header>
   <div id="viewer">
     <div id="hud">Betöltés…</div>
@@ -33,41 +35,38 @@
   </div>
   <div class="panel">
     <div class="group">
-      <label>EV</label>
-      <select id="selEV">
-        <option value="1" selected>1</option>
-        <option value="0">0</option>
-        <option value="3">3</option>
-        <option value="6">6</option>
-      </select>
-      <label>AV</label>
-      <select id="selAV">
-        <option value="15" selected>15</option>
-        <option value="0">0</option>
-        <option value="6">6</option>
-        <option value="10">10</option>
-      </select>
-      <label>L1</label>
-      <select id="selL1">
-        <option value="30">30</option>
-        <option value="20">20</option>
-        <option value="40">40</option>
-        <option value="100" selected>100</option>
-      </select>
-      <label>L1+L2</label>
-      <select id="selL12">
-        <option value="60">60</option>
-        <option value="30">30</option>
-        <option value="80">80</option>
-        <option value="100" selected>100</option>
-      </select>
-      <button id="btnApply">Kombináció alkalmazása</button>
+      <div class="row">
+        <label>EV</label>
+        <select id="selEV"><option value="1" selected>1</option><option value="0">0</option><option value="3">3</option><option value="6">6</option></select>
+        <label>AV</label>
+        <select id="selAV"><option value="15" selected>15</option><option value="0">0</option><option value="6">6</option><option value="10">10</option></select>
+        <label>L1</label>
+        <select id="selL1"><option value="30">30</option><option value="20">20</option><option value="40">40</option><option value="100" selected>100</option></select>
+        <label>L1+L2</label>
+        <select id="selL12"><option value="60">60</option><option value="30">30</option><option value="80">80</option><option value="100" selected>100</option></select>
+      </div>
+      <div class="row">
+        <button id="btnApply">Kombináció alkalmazása</button>
+        <button id="btnHoriz">Vízszintes</button>
+        <button id="btnUpright">Álló</button>
+        <button id="btnFocusDip">Fókusz DIP</button>
+        <button id="btnTest">Teszt Dip‑1 ON/OFF</button>
+      </div>
     </div>
+
     <div class="group">
-      <button id="btnHoriz">Vízszintesbe</button>
-      <button id="btnUpright">Álló helyzet</button>
-      <button id="btnFocusDip">Fókusz DIP</button>
-      <button id="btnTest">Teszt Dip‑1 ON/OFF</button>
+      <div class="row">
+        <label>DIP debug</label>
+        <select id="selDipIdx"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        <button id="btnGhostFix">Ghost‑fix e DIP körül</button>
+        <button id="btnSolo">Csak ez látszódjon</button>
+        <button id="btnUnsolo">Összes vissza</button>
+        <button id="btnBlink">Villogtasd a rotáltakat</button>
+      </div>
+      <div id="meshListWrap">
+        <div style="opacity:.7">Rotált mesh-ek ezen a DIP-en:</div>
+        <ul id="meshList"></ul>
+      </div>
     </div>
   </div>
 </div>
@@ -84,7 +83,7 @@ const viewer = document.getElementById('viewer');
 // Scene
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight - 120);
+renderer.setSize(window.innerWidth, window.innerHeight - 180);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewer.appendChild(renderer.domElement);
 
@@ -100,7 +99,7 @@ const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(5,5,6); 
 function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
 animate();
 window.addEventListener('resize', ()=>{
-  renderer.setSize(window.innerWidth, window.innerHeight - 120);
+  renderer.setSize(window.innerWidth, window.innerHeight - 180);
   camera.aspect = renderer.domElement.width/renderer.domElement.height;
   camera.updateProjectionMatrix();
 });
@@ -115,16 +114,37 @@ const candidates = [
 ];
 
 let root=null;
-// idx -> {group, parts:[mesh1,mesh2,..], bases:[z1,z2,..], on}
+// idx -> {group, parts:[mesh...], extras:[mesh...], bases:[z...], on}
 let dips=new Map();
 const ON_RAD = Math.PI*35/180;
 
-function normName(n){ return (n||'').toLowerCase().replace(/[\s \u00A0]+/g,''); } // sima/kemény szóköz is
+function normName(n){ return (n||'').toLowerCase().replace(/[\s \u00A0]+/g,''); }
 
 function collectMeshes(node){
   const arr=[];
   node.traverse(n=>{ if(n.isMesh) arr.push(n); });
   return arr;
+}
+
+function allSceneMeshes(sceneRoot){
+  const arr=[];
+  sceneRoot.traverse(n=>{ if(n.isMesh) arr.push(n); });
+  return arr;
+}
+
+function getBox(obj){
+  const box = new THREE.Box3();
+  box.setFromObject(obj);
+  return box;
+}
+
+function expandBox(box, f=1.1){
+  const size = new THREE.Vector3(); box.getSize(size);
+  const center = new THREE.Vector3(); box.getCenter(center);
+  size.multiplyScalar(f);
+  const min = center.clone().sub(size.clone().multiplyScalar(0.5));
+  const max = center.clone().add(size.clone().multiplyScalar(0.5));
+  return new THREE.Box3(min, max);
 }
 
 function loadNext(i=0){
@@ -141,6 +161,8 @@ function loadNext(i=0){
 
 function setupAfterLoad(){
   dips.clear();
+  root.rotation.x = -Math.PI/2;
+  const everyMesh = allSceneMeshes(root);
   const info=[];
   root.traverse(n=>{
     const nm = normName(n.name);
@@ -149,11 +171,11 @@ function setupAfterLoad(){
       const idx = parseInt(m[1],10);
       const parts = collectMeshes(n);
       const bases = parts.map(p=>p.rotation.z);
-      dips.set(idx, {group:n, parts, bases, on:true});
-      info.push(`Dip-${idx}: ${parts.length} mesh`);
+      dips.set(idx, {group:n, parts, extras:[], bases, on:true});
+      info.push(`Dip-${idx}: ${parts.length} mesh (gyerekek)`);
     }
   });
-  root.rotation.x = -Math.PI/2;
+  // fit view
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
@@ -162,22 +184,23 @@ function setupAfterLoad(){
   const dist = size*0.9;
   camera.position.copy(center.clone().add(new THREE.Vector3(dist, dist*0.6, dist)));
   controls.update();
-  hud.textContent = `Betöltve. ${[...dips.keys()].length} DIP\n${info.join('\\n')}`;
+  hud.textContent = `Betöltve.\n${info.join('\\n')}`;
+  refreshDebugList();
 }
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
-  d.parts.forEach((mesh,i)=>{
-    const baseZ = d.bases[i];
+  const all = [...d.parts, ...d.extras];
+  all.forEach((mesh,i)=>{
+    const baseZ = (i < d.bases.length) ? d.bases[i] : mesh.rotation.z;
     mesh.rotation.z = isOn ? baseZ : (baseZ - ON_RAD);
     mesh.updateMatrixWorld(true);
   });
   d.on = isOn;
 }
 
-// Mapping — EV=1 és AV=15 az OFF/OFF
 function compute(evv,avv,l1,l12){
   let S1=false,S2=false;
   if(evv===1){ /*00*/ }
@@ -209,14 +232,69 @@ function applyCombo(){
   for(let i=0;i<8;i++) setDip(i+1, st[i]);
   hud.textContent = `EV:${evv} AV:${avv} L1:${l1} L1+L2:${l12}\\nTarget: ${st.map(v=>v?1:0).join('')}`;
 }
-
 ['selEV','selAV','selL1','selL12'].forEach(id=> document.getElementById(id).addEventListener('change', applyCombo));
 document.getElementById('btnApply').onclick = applyCombo;
+
+// Debug helpers
+function refreshDebugList(){
+  const ul = document.getElementById('meshList');
+  ul.innerHTML='';
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  const all = [...d.parts, ...d.extras];
+  all.forEach(m=>{
+    const li=document.createElement('li');
+    li.textContent = m.name || m.parent?.name || m.type;
+    ul.appendChild(li);
+  });
+}
+document.getElementById('selDipIdx').addEventListener('change', refreshDebugList);
+
+document.getElementById('btnGhostFix').onclick = ()=>{
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  const dipBox = expandBox(getBox(d.group), 1.15);
+  const added=[];
+  root.traverse(n=>{
+    if(!n.isMesh) return;
+    if(d.parts.includes(n) || d.extras.includes(n)) return;
+    const nb = getBox(n);
+    if(dipBox.intersectsBox(nb)){
+      d.extras.push(n);
+      added.push(n.name || n.parent?.name || n.type);
+    }
+  });
+  hud.textContent = `Ghost‑fix Dip-${idx}: +${added.length} mesh hozzáadva`;
+  refreshDebugList();
+};
+
+document.getElementById('btnSolo').onclick = ()=>{
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  const keep = new Set([...d.parts, ...d.extras].map(x=>x.id));
+  root.traverse(n=>{ if(n.isMesh) n.visible = keep.has(n.id); });
+};
+document.getElementById('btnUnsolo').onclick = ()=>{
+  root.traverse(n=>{ if(n.isMesh) n.visible = true; });
+};
+
+document.getElementById('btnBlink').onclick = async ()=>{
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  const all = [...d.parts, ...d.extras];
+  for(let k=0;k<4;k++){
+    all.forEach(m=> m.visible = !m.visible);
+    await new Promise(r=> setTimeout(r, 200));
+  }
+  all.forEach(m=> m.visible = true);
+};
+
 document.getElementById('btnHoriz').onclick = ()=>{ if(root){ root.rotation.x = -Math.PI/2; } };
 document.getElementById('btnUpright').onclick = ()=>{ if(root){ root.rotation.x = 0; } };
 document.getElementById('btnFocusDip').onclick = ()=>{
   if(!root) return;
-  const target = dips.get(4)?.group || dips.get(1)?.group;
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const target = dips.get(idx)?.group || dips.get(1)?.group;
   if(!target) return;
   const box = new THREE.Box3().setFromObject(target.parent || target);
   const center = box.getCenter(new THREE.Vector3());
@@ -224,6 +302,7 @@ document.getElementById('btnFocusDip').onclick = ()=>{
   camera.position.copy(center.clone().add(new THREE.Vector3(0.25,0.15,0.35)));
   controls.update();
 };
+
 document.getElementById('btnTest').onclick = ()=>{ const d = dips.get(1); if(!d) return; setDip(1, !d.on); };
 
 loadNext();
