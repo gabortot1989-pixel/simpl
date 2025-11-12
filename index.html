@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir‑EC — Three.js (Netlify v3)</title>
+  <title>SimplAir‑EC — Three.js (Netlify v4)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{height:100%;margin:0;background:#0b0e14;color:var(--text);font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow:hidden}
@@ -15,7 +15,7 @@
     .panel{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 12px;background:#0e1219;border-top:1px solid #131a26}
     .group{display:flex;gap:8px;align-items:center;background:#0f141c;padding:8px 10px;border-radius:10px;border:1px solid #1f2937}
     select,button{background:#0e1420;color:#d5dde8;border:1px solid #223;padding:6px 8px;border-radius:8px;cursor:pointer}
-    #hud{position:absolute;top:10px;right:10px;background:#14213a;border:1px solid #26416b;color:#dbeafe;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:60ch}
+    #hud{position:absolute;top:10px;right:10px;background:#14213a;border:1px solid #26416b;color:#dbeafe;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:72ch}
     #err{position:absolute;bottom:10px;right:10px;background:#3a1414;border:1px solid #6b2626;color:#ffd6d6;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:60ch;display:none}
   </style>
   <script type="importmap">
@@ -25,7 +25,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v3</span>
+    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v4</span>
   </header>
   <div id="viewer">
     <div id="hud">Betöltés…</div>
@@ -115,14 +115,16 @@ const candidates = [
 ];
 
 let root=null;
-let dips=new Map(); // idx -> {group, mesh, baseZ, on}
+// idx -> {group, parts:[mesh1,mesh2,..], bases:[z1,z2,..], on}
+let dips=new Map();
 const ON_RAD = Math.PI*35/180;
 
-function normName(n){ return (n||'').toLowerCase().replace(/[\s \u00A0]+/g,''); } // sima/kemény szóközök is
+function normName(n){ return (n||'').toLowerCase().replace(/[\s \u00A0]+/g,''); } // sima/kemény szóköz is
 
-function firstMesh(node){
-  let found=null; node.traverse(n=>{ if(!found && n.isMesh) found=n; });
-  return found;
+function collectMeshes(node){
+  const arr=[];
+  node.traverse(n=>{ if(n.isMesh) arr.push(n); });
+  return arr;
 }
 
 function loadNext(i=0){
@@ -139,17 +141,18 @@ function loadNext(i=0){
 
 function setupAfterLoad(){
   dips.clear();
-  const present=[];
+  const info=[];
   root.traverse(n=>{
     const nm = normName(n.name);
     const m = nm.match(/^dip[-_]?(\d)$/i);
     if(m){
       const idx = parseInt(m[1],10);
-      const mesh = firstMesh(n) || n;
-      dips.set(idx, {group:n, mesh, baseZ:null, on:true});
+      const parts = collectMeshes(n);
+      const bases = parts.map(p=>p.rotation.z);
+      dips.set(idx, {group:n, parts, bases, on:true});
+      info.push(`Dip-${idx}: ${parts.length} mesh`);
     }
   });
-  for(let i=1;i<=8;i++) present.push(dips.has(i)?i:'—');
   root.rotation.x = -Math.PI/2;
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()).length();
@@ -159,21 +162,22 @@ function setupAfterLoad(){
   const dist = size*0.9;
   camera.position.copy(center.clone().add(new THREE.Vector3(dist, dist*0.6, dist)));
   controls.update();
-  hud.textContent = `Betöltve. DIP jelenlét: ${present.join(' ')}`;
+  hud.textContent = `Betöltve. ${[...dips.keys()].length} DIP\n${info.join('\\n')}`;
 }
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
-  const node = d.mesh;
-  if(d.baseZ === null) d.baseZ = node.rotation.z; // gyári 35° (ON)
-  node.rotation.z = isOn ? d.baseZ : (d.baseZ - ON_RAD);
-  node.updateMatrixWorld(true);
+  d.parts.forEach((mesh,i)=>{
+    const baseZ = d.bases[i];
+    mesh.rotation.z = isOn ? baseZ : (baseZ - ON_RAD);
+    mesh.updateMatrixWorld(true);
+  });
   d.on = isOn;
 }
 
-// Mapping — kifejezetten kezeljük az EV=1 és AV=15 esetet (OFF/OFF).
+// Mapping — EV=1 és AV=15 az OFF/OFF
 function compute(evv,avv,l1,l12){
   let S1=false,S2=false;
   if(evv===1){ /*00*/ }
@@ -203,8 +207,7 @@ function applyCombo(){
   const l12 = parseInt(document.getElementById('selL12').value,10);
   const st = compute(evv,avv,l1,l12);
   for(let i=0;i<8;i++) setDip(i+1, st[i]);
-  const present = [...Array(8)].map((_,i)=> dips.has(i+1)?1:0).join('');
-  hud.textContent = `EV:${evv} AV:${avv} L1:${l1} L1+L2:${l12}\nDIP target: ${st.map(v=>v?1:0).join('')}  |  present: ${present}`;
+  hud.textContent = `EV:${evv} AV:${avv} L1:${l1} L1+L2:${l12}\\nTarget: ${st.map(v=>v?1:0).join('')}`;
 }
 
 ['selEV','selAV','selL1','selL12'].forEach(id=> document.getElementById(id).addEventListener('change', applyCombo));
