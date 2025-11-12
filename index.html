@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir‑EC — Three.js (Netlify v5, Ghost‑fix)</title>
+  <title>SimplAir‑EC — Three.js (Netlify v6, Dupla‑kar fix)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{height:100%;margin:0;background:#0b0e14;color:var(--text);font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow:hidden}
@@ -27,7 +27,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v5 • Ghost‑fix</span>
+    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v6 • Dupla‑kar fix</span>
   </header>
   <div id="viewer">
     <div id="hud">Betöltés…</div>
@@ -58,13 +58,12 @@
       <div class="row">
         <label>DIP debug</label>
         <select id="selDipIdx"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
-        <button id="btnGhostFix">Ghost‑fix e DIP körül</button>
         <button id="btnSolo">Csak ez látszódjon</button>
         <button id="btnUnsolo">Összes vissza</button>
-        <button id="btnBlink">Villogtasd a rotáltakat</button>
+        <button id="btnBlink">Villogtasd a kijelölt DIP‑et</button>
       </div>
       <div id="meshListWrap">
-        <div style="opacity:.7">Rotált mesh-ek ezen a DIP-en:</div>
+        <div style="opacity:.7">Állapot szerinti besorolás ezen a DIP-en:</div>
         <ul id="meshList"></ul>
       </div>
     </div>
@@ -114,7 +113,7 @@ const candidates = [
 ];
 
 let root=null;
-// idx -> {group, parts:[mesh...], extras:[mesh...], bases:[z...], on}
+// idx -> {group, meshes:[mesh...], baseZ:[...], onGroup:Set, offGroup:Set, on:true}
 let dips=new Map();
 const ON_RAD = Math.PI*35/180;
 
@@ -124,27 +123,6 @@ function collectMeshes(node){
   const arr=[];
   node.traverse(n=>{ if(n.isMesh) arr.push(n); });
   return arr;
-}
-
-function allSceneMeshes(sceneRoot){
-  const arr=[];
-  sceneRoot.traverse(n=>{ if(n.isMesh) arr.push(n); });
-  return arr;
-}
-
-function getBox(obj){
-  const box = new THREE.Box3();
-  box.setFromObject(obj);
-  return box;
-}
-
-function expandBox(box, f=1.1){
-  const size = new THREE.Vector3(); box.getSize(size);
-  const center = new THREE.Vector3(); box.getCenter(center);
-  size.multiplyScalar(f);
-  const min = center.clone().sub(size.clone().multiplyScalar(0.5));
-  const max = center.clone().add(size.clone().multiplyScalar(0.5));
-  return new THREE.Box3(min, max);
 }
 
 function loadNext(i=0){
@@ -162,7 +140,6 @@ function loadNext(i=0){
 function setupAfterLoad(){
   dips.clear();
   root.rotation.x = -Math.PI/2;
-  const everyMesh = allSceneMeshes(root);
   const info=[];
   root.traverse(n=>{
     const nm = normName(n.name);
@@ -170,9 +147,15 @@ function setupAfterLoad(){
     if(m){
       const idx = parseInt(m[1],10);
       const parts = collectMeshes(n);
-      const bases = parts.map(p=>p.rotation.z);
-      dips.set(idx, {group:n, parts, extras:[], bases, on:true});
-      info.push(`Dip-${idx}: ${parts.length} mesh (gyerekek)`);
+      const baseZ = parts.map(p=>p.rotation.z);
+      // Két klaszter a baseZ alapján
+      const minZ = Math.min(...baseZ), maxZ = Math.max(...baseZ);
+      const mid = (minZ + maxZ)/2;
+      const onGroup = new Set();   // ~35° körüli
+      const offGroup = new Set();  // ~0° körüli
+      parts.forEach((p,i)=>{ (baseZ[i] >= mid ? onGroup : offGroup).add(p); });
+      dips.set(idx, {group:n, meshes:parts, baseZ, onGroup, offGroup, on:true});
+      info.push(`Dip-${idx}: ${parts.length} mesh | ON: ${onGroup.size}, OFF: ${offGroup.size}`);
     }
   });
   // fit view
@@ -185,6 +168,16 @@ function setupAfterLoad(){
   camera.position.copy(center.clone().add(new THREE.Vector3(dist, dist*0.6, dist)));
   controls.update();
   hud.textContent = `Betöltve.\n${info.join('\\n')}`;
+  // Alaphelyzet: csak az ON csoport látszik
+  dips.forEach(d=>{
+    d.meshes.forEach((m,i)=>{
+      const isOnMesh  = d.onGroup.has(m);
+      const isOffMesh = d.offGroup.has(m);
+      m.visible = isOnMesh; // csak ON
+      if(isOnMesh) m.rotation.z = d.baseZ[i];
+      if(isOffMesh) m.rotation.z = d.baseZ[i] - ON_RAD;
+    });
+  });
   refreshDebugList();
 }
 
@@ -192,15 +185,19 @@ function fail(message){ err.style.display='block'; err.textContent = message; }
 
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
-  const all = [...d.parts, ...d.extras];
-  all.forEach((mesh,i)=>{
-    const baseZ = (i < d.bases.length) ? d.bases[i] : mesh.rotation.z;
-    mesh.rotation.z = isOn ? baseZ : (baseZ - ON_RAD);
-    mesh.updateMatrixWorld(true);
+  d.meshes.forEach((m,i)=>{
+    const inOn  = d.onGroup.has(m);
+    const inOff = d.offGroup.has(m);
+    m.visible = isOn ? inOn : inOff;
+    // Precíz állás
+    if(inOn)  m.rotation.z = d.baseZ[i];
+    if(inOff) m.rotation.z = d.baseZ[i] - ON_RAD;
+    m.updateMatrixWorld(true);
   });
   d.on = isOn;
 }
 
+// Mapping
 function compute(evv,avv,l1,l12){
   let S1=false,S2=false;
   if(evv===1){ /*00*/ }
@@ -241,37 +238,19 @@ function refreshDebugList(){
   ul.innerHTML='';
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
-  const all = [...d.parts, ...d.extras];
-  all.forEach(m=>{
+  d.meshes.forEach((m,i)=>{
+    const tag = d.onGroup.has(m) ? '[ON]' : (d.offGroup.has(m) ? '[OFF]' : '[?]');
     const li=document.createElement('li');
-    li.textContent = m.name || m.parent?.name || m.type;
+    li.textContent = `${tag} ${m.name || m.parent?.name || m.type}`;
     ul.appendChild(li);
   });
 }
 document.getElementById('selDipIdx').addEventListener('change', refreshDebugList);
 
-document.getElementById('btnGhostFix').onclick = ()=>{
-  const idx = parseInt(document.getElementById('selDipIdx').value,10);
-  const d = dips.get(idx); if(!d) return;
-  const dipBox = expandBox(getBox(d.group), 1.15);
-  const added=[];
-  root.traverse(n=>{
-    if(!n.isMesh) return;
-    if(d.parts.includes(n) || d.extras.includes(n)) return;
-    const nb = getBox(n);
-    if(dipBox.intersectsBox(nb)){
-      d.extras.push(n);
-      added.push(n.name || n.parent?.name || n.type);
-    }
-  });
-  hud.textContent = `Ghost‑fix Dip-${idx}: +${added.length} mesh hozzáadva`;
-  refreshDebugList();
-};
-
 document.getElementById('btnSolo').onclick = ()=>{
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
-  const keep = new Set([...d.parts, ...d.extras].map(x=>x.id));
+  const keep = new Set(d.meshes.map(x=>x.id));
   root.traverse(n=>{ if(n.isMesh) n.visible = keep.has(n.id); });
 };
 document.getElementById('btnUnsolo').onclick = ()=>{
@@ -281,12 +260,11 @@ document.getElementById('btnUnsolo').onclick = ()=>{
 document.getElementById('btnBlink').onclick = async ()=>{
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
-  const all = [...d.parts, ...d.extras];
   for(let k=0;k<4;k++){
-    all.forEach(m=> m.visible = !m.visible);
-    await new Promise(r=> setTimeout(r, 200));
+    d.meshes.forEach(m=> m.visible = !m.visible);
+    await new Promise(r=> setTimeout(r, 220));
   }
-  all.forEach(m=> m.visible = true);
+  applyCombo();
 };
 
 document.getElementById('btnHoriz').onclick = ()=>{ if(root){ root.rotation.x = -Math.PI/2; } };
