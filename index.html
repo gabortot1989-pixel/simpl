@@ -193,7 +193,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.152.2/examples/jsm/loaders
 
 const viewer = document.getElementById("viewer");
 const hud = document.getElementById("hud");
-const debugList = document.getElementById("debugList");
+
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -386,43 +386,6 @@ document.getElementById("btnFocusDip").onclick = ()=>{
   controls.target.copy(c);
 };
 
-document.getElementById("btnTest").onclick = ()=>{
-  const idx = 1;
-  const d = dips.get(idx); if(!d) return;
-  setDip(idx, !d.on);
-};
-
-document.getElementById("btnGhostFix").onclick = ()=>{
-  debugList.innerHTML = "";
-  dips.forEach((d,idx)=>{
-    const li = document.createElement("li");
-    li.textContent = `DIP-${idx}: Meshes=${d.meshes.length}`;
-    debugList.appendChild(li);
-  });
-};
-
-document.getElementById("btnSoloDip").onclick = ()=>{
-  const idx = parseInt(document.getElementById("selDipDbg").value,10);
-  dipGroups.forEach((g,i)=> g.visible = (i===idx));
-};
-document.getElementById("btnUnsolo").onclick = ()=>{
-  dipGroups.forEach(g=> g.visible = true);
-};
-document.getElementById("btnBlink").onclick = ()=>{
-  let t = 0;
-  const rot = [];
-  dips.forEach((d,idx)=>{
-    d.meshes.forEach(m=> rot.push(m));
-  });
-  const id = setInterval(()=>{
-    t++;
-    rot.forEach(m=> m.visible = (t%2===0));
-    if(t>8){
-      clearInterval(id);
-      rot.forEach(m=> m.visible = true);
-    }
-  },200);
-};
 </script>
 </body>
 </html>
