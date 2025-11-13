@@ -142,9 +142,7 @@ function setupAfterLoad(){
   root.rotation.x = -Math.PI/2;
   const info=[];
   
-
-
-  root.traverse(n=>{
+root.traverse(n=>{
     const nm = normName(n.name);
     const m = nm.match(/^dip[-_]?([1-8])$/i);
     if(!m) return;
@@ -152,22 +150,25 @@ function setupAfterLoad(){
     const parts = collectMeshes(n);
     if(!parts.length) return;
 
-    // Volumenkörper1.104 = a felső, mozgó kar; a többi "szellem" lent marad.
+    // A GLB-ben minden DIP alatt kétféle mesh van:
+    //  - Volumenkörper1.104: alsó fix sor (zöld alapon ülő rész)
+    //  - minden más: a tényleges mozgó kar
     const leverMeshes = [];
-    const ghosts = [];
+    const ghostMeshes = [];
     for(const p of parts){
       const pn = normName(p.name);
-      if(pn.includes('volumenkörper1.104')) leverMeshes.push(p);
-      else ghosts.push(p);
+      if(pn.includes('volumenkörper1.104')) ghostMeshes.push(p);
+      else leverMeshes.push(p);
     }
-    if(leverMeshes.length){
-      ghosts.forEach(g=> g.visible = false);
+    if(ghostMeshes.length){
+      ghostMeshes.forEach(g=> g.visible = false); // szellemek eltüntetése
     }
     const keep = leverMeshes.length ? leverMeshes : parts;
     const baseZ = keep.map(p=>p.rotation.z);
-    dips.set(idx,{parts:keep, baseZ, on:true});
+    dips.set(idx, {group:n, meshes:keep, baseZ, on:true});
+    info.push(`Dip-${idx}: ${keep.length} aktív mesh, ghost: ${ghostMeshes.length}`);
   });
-// fit view
+  // fit view
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
@@ -192,18 +193,16 @@ function setupAfterLoad(){
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
+
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
   d.meshes.forEach((m,i)=>{
-    const inOn  = d.onGroup.has(m);
-    const inOff = d.offGroup.has(m);
-    m.visible = isOn ? inOn : inOff;
-    // Precíz állás
-    if(inOn)  m.rotation.z = d.baseZ[i];
-    if(inOff) m.rotation.z = d.baseZ[i] - ON_RAD;
+    m.visible = true; // mindig ugyanaz a kar látszik
+    m.rotation.z = d.baseZ[i] + (isOn ? 0 : -ON_RAD);
     m.updateMatrixWorld(true);
   });
   d.on = isOn;
+}
 }
 
 // Mapping
