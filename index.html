@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir-EC — Three.js (Netlify v5, Ghost-fix)</title>
+  <title>SimplAir-EC — Three.js (v5 + végleges DIP-fix)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{
@@ -112,7 +112,7 @@
 <div id="app">
   <header>
     <h1>SimplAir-EC – DIP demó</h1>
-    <span style="font-size:12px;opacity:.75">Netlify v5 + Ghost-fix</span>
+    <span style="font-size:12px;opacity:.75">v5 + végleges ghost-fix</span>
   </header>
 
   <div id="viewer">
@@ -259,45 +259,38 @@ loader.load(
 
     const info = [];
 
-    // *** DIP-ek felépítése + ghost-fix ***
+    // *** DIP-ek felépítése + GHOST FIX NÉV ALAPJÁN ***
     root.traverse(n=>{
       const nm = normName(n.name);
       const m = nm.match(/^dip[-_]?([1-8])$/i);
       if(!m) return;
-      const idx = parseInt(m[1],10);
 
+      const idx = parseInt(m[1],10);
       dipGroups.set(idx, n);
 
       const parts = collectMeshes(n);
       if(!parts.length) return;
 
-      // Minden mesh world-pozíciója
-      const tmp = new THREE.Vector3();
-      const withPos = parts.map(p=>{
-        p.getWorldPosition(tmp);
-        return { mesh: p, y: tmp.y };
-      });
+      const leverMeshes = [];
+      const ghosts = [];
 
-      // Alsó–felső sor szétválasztása Y szerint
-      withPos.sort((a,b)=>a.y - b.y);
-      let upper = [], lower = [];
-
-      if(withPos.length <= 2){
-        upper = withPos.map(o=>o.mesh);
-      } else {
-        const mid = 0.5 * (withPos[0].y + withPos[withPos.length-1].y);
-        for(const o of withPos){
-          if(o.y >= mid) upper.push(o.mesh);  // felső sor – mozgó karok
-          else lower.push(o.mesh);           // alsó sor – fix „szellemek”
-        }
+      for(const p of parts){
+        const pn = normName(p.name);
+        // A mozgó kar neve: Volumenkörper1.104  → EZEKEKET tartjuk meg
+        if(pn.includes("volumenkörper1.104")) leverMeshes.push(p);
+        else ghosts.push(p); // minden más a fix / szellem rész
       }
 
-      // Alsó sor elrejtése
-      lower.forEach(m=> m.visible = false);
+      // ha valamiért nem találjuk a volumenkörper1.104-et, fallback az összesre
+      const keep = leverMeshes.length ? leverMeshes : parts;
 
-      const baseZ = upper.map(m=>m.rotation.z);
-      dips.set(idx, {meshes:upper, baseZ, on:true});
-      info.push(`Dip-${idx}: ${upper.length} aktív mesh, ghost: ${lower.length}`);
+      // GHOST ELREJTÉSE: csak a mozgó karok maradjanak
+      ghosts.forEach(g => { if(!keep.includes(g)) g.visible = false; });
+
+      const baseZ = keep.map(m=>m.rotation.z);
+      dips.set(idx,{meshes:keep, baseZ, on:true});
+
+      info.push(`Dip-${idx}: keep=${keep.length}, ghost=${ghosts.length}`);
     });
 
     // fit view
@@ -307,7 +300,9 @@ loader.load(
     controls.target.copy(center);
     camera.near = size / 100;
     camera.far = size * 10;
-    camera.position.copy(center.clone().add(new THREE.Vector3(size*0.9, size*0.6, size*0.9)));
+    camera.position.copy(
+      center.clone().add(new THREE.Vector3(size*0.9, size*0.6, size*0.9))
+    );
     camera.updateProjectionMatrix();
 
     hud.textContent = "Betöltve.\n" + info.join("\n");
