@@ -164,18 +164,44 @@ function setupAfterLoad(){
   root.rotation.x = -Math.PI/2;
   const everyMesh = allSceneMeshes(root);
   const info=[];
+  
   root.traverse(n=>{
     const nm = normName(n.name);
-    const m = nm.match(/^dip[-_]?(\d)$/i);
-    if(m){
-      const idx = parseInt(m[1],10);
-      const parts = collectMeshes(n);
-      const bases = parts.map(p=>p.rotation.z);
-      dips.set(idx, {group:n, parts, extras:[], bases, on:true});
-      info.push(`Dip-${idx}: ${parts.length} mesh (gyerekek)`);
+    const m = nm.match(/^dip[-_]?([1-8])$/i);
+    if(!m) return;
+    const idx = parseInt(m[1],10);
+    const parts = collectMeshes(n);
+    if(!parts.length) return;
+
+    // Minden mesh world-pozíciója
+    const tmp = new THREE.Vector3();
+    const withPos = parts.map(p=>{
+      p.getWorldPosition(tmp);
+      return { mesh: p, y: tmp.y };
+    });
+
+    // Alsó–felső sor szétválasztása Y szerint
+    withPos.sort((a,b)=>a.y - b.y);
+    let upper = [], lower = [];
+
+    if(withPos.length <= 2){
+      upper = withPos.map(o=>o.mesh);
+    }else{
+      const mid = 0.5 * (withPos[0].y + withPos[withPos.length-1].y);
+      for(const o of withPos){
+        if(o.y >= mid) upper.push(o.mesh);  // felső sor – mozgó karok
+        else lower.push(o.mesh);           // alsó sor – fix „szellemek”
+      }
     }
+
+    // Alsó sor elrejtése
+    lower.forEach(m=> m.visible = false);
+
+    const baseZ = upper.map(m=>m.rotation.z);
+    dips.set(idx, {meshes:upper, baseZ, on:true});
+    info.push(`Dip-${idx}: ${upper.length} aktiv mesh, ghost: ${lower.length}`);
   });
-  // fit view
+// fit view
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
@@ -190,16 +216,16 @@ function setupAfterLoad(){
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
+
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
-  const all = [...d.parts, ...d.extras];
-  all.forEach((mesh,i)=>{
-    const baseZ = (i < d.bases.length) ? d.bases[i] : mesh.rotation.z;
-    mesh.rotation.z = isOn ? baseZ : (baseZ - ON_RAD);
+  d.meshes.forEach((mesh,i)=>{
+    mesh.rotation.z = d.baseZ[i] + (isOn ? 0 : -ON_RAD);
     mesh.updateMatrixWorld(true);
   });
   d.on = isOn;
 }
+
 
 function compute(evv,avv,l1,l12){
   let S1=false,S2=false;
