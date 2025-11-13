@@ -143,49 +143,31 @@ function setupAfterLoad(){
   const info=[];
   
 
-root.traverse(n=>{
+
+  root.traverse(n=>{
     const nm = normName(n.name);
-
     const m = nm.match(/^dip[-_]?([1-8])$/i);
-    if(m){
-      const idx = parseInt(m[1],10);
-      const parts = collectMeshes(n);
-      if(!parts.length) return;
+    if(!m) return;
+    const idx = parseInt(m[1],10);
+    const parts = collectMeshes(n);
+    if(!parts.length) return;
 
-      // Kétféle mesh: a Volumenkörper1.104 nevűek (valódi mozgó karok),
-      // és minden más, ami "szellemként" lent marad. Csak az előbbiek maradjanak láthatók.
-      const leverMeshes = [];
-      const ghostMeshes = [];
-      for(const p of parts){
-        const pn = normName(p.name);
-        if(pn.includes('volumenkörper1.104')) leverMeshes.push(p);
-        else ghostMeshes.push(p);
-      }
-      if(leverMeshes.length){
-        ghostMeshes.forEach(g=> g.visible = false);
-      }
-      const keep = leverMeshes.length ? leverMeshes : parts;
-
-      const baseZ = keep.map(p=>p.rotation.z);
-      dips.set(idx,{parts:keep, baseZ, on:true});
-      return;
+    // Volumenkörper1.104 = a felső, mozgó kar; a többi "szellem" lent marad.
+    const leverMeshes = [];
+    const ghosts = [];
+    for(const p of parts){
+      const pn = normName(p.name);
+      if(pn.includes('volumenkörper1.104')) leverMeshes.push(p);
+      else ghosts.push(p);
     }
-const m = nm.match(/^dip[-_]?(\d)$/i);
-    if(m){
-      const idx = parseInt(m[1],10);
-      const parts = collectMeshes(n);
-      const baseZ = parts.map(p=>p.rotation.z);
-      // Két klaszter a baseZ alapján
-      const minZ = Math.min(...baseZ), maxZ = Math.max(...baseZ);
-      const mid = (minZ + maxZ)/2;
-      const onGroup = new Set();   // ~35° körüli
-      const offGroup = new Set();  // ~0° körüli
-      parts.forEach((p,i)=>{ (baseZ[i] >= mid ? onGroup : offGroup).add(p); });
-      dips.set(idx, {group:n, meshes:parts, baseZ, onGroup, offGroup, on:true});
-      info.push(`Dip-${idx}: ${parts.length} mesh | ON: ${onGroup.size}, OFF: ${offGroup.size}`);
+    if(leverMeshes.length){
+      ghosts.forEach(g=> g.visible = false);
     }
+    const keep = leverMeshes.length ? leverMeshes : parts;
+    const baseZ = keep.map(p=>p.rotation.z);
+    dips.set(idx,{parts:keep, baseZ, on:true});
   });
-  // fit view
+// fit view
   const box = new THREE.Box3().setFromObject(root);
   const size = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
