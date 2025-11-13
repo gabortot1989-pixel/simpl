@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir‑EC — Three.js (Netlify v7, Swap ON/OFF)</title>
+  <title>SimplAir‑EC — Three.js (Netlify v8, Click‑to‑Add)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{height:100%;margin:0;background:#0b0e14;color:var(--text);font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow:hidden}
@@ -11,7 +11,7 @@
     header{display:flex;gap:10px;align-items:center;padding:10px 12px}
     header h1{font-size:16px;margin:0}
     #viewer{position:relative}
-    canvas{display:block}
+    canvas{display:block;cursor:default}
     .panel{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;padding:10px 12px;background:#0e1219;border-top:1px solid #131a26}
     .group{display:flex;flex-direction:column;gap:8px;background:#0f141c;padding:10px;border-radius:10px;border:1px solid #1f2937;min-width:320px}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -19,6 +19,7 @@
     #hud{position:absolute;top:10px;right:10px;background:#14213a;border:1px solid #26416b;color:#dbeafe;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:72ch}
     #err{position:absolute;bottom:10px;right:10px;background:#3a1414;border:1px solid #6b2626;color:#ffd6d6;padding:8px;border-radius:10px;font-size:12px;white-space:pre;max-width:60ch;display:none}
     ul{margin:0;padding-left:18px;max-height:160px;overflow:auto}
+    .pick{background:#123;border-color:#2a6;box-shadow:0 0 0 2px #2a6 inset}
   </style>
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.152.2/build/three.module.js" } }
@@ -27,7 +28,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v7 • ON/OFF csere</span>
+    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v8 • Click‑to‑Add</span>
   </header>
   <div id="viewer">
     <div id="hud">Betöltés…</div>
@@ -63,6 +64,11 @@
         <button id="btnSolo">Csak ez látszódjon</button>
         <button id="btnUnsolo">Összes vissza</button>
       </div>
+      <div class="row">
+        <button id="btnPickOn">Hozzáadás kattintással [ON]</button>
+        <button id="btnPickOff">Hozzáadás kattintással [OFF]</button>
+        <button id="btnPickCancel">Kijelölés mód KI</button>
+      </div>
       <div id="meshListWrap">
         <div style="opacity:.7">Állapot szerinti besorolás ezen a DIP-en:</div>
         <ul id="meshList"></ul>
@@ -83,7 +89,7 @@ const viewer = document.getElementById('viewer');
 // Scene
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight - 180);
+renderer.setSize(window.innerWidth, window.innerHeight - 200);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewer.appendChild(renderer.domElement);
 
@@ -99,7 +105,7 @@ const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(5,5,6); 
 function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
 animate();
 window.addEventListener('resize', ()=>{
-  renderer.setSize(window.innerWidth, window.innerHeight - 180);
+  renderer.setSize(window.innerWidth, window.innerHeight - 200);
   camera.aspect = renderer.domElement.width/renderer.domElement.height;
   camera.updateProjectionMatrix();
 });
@@ -191,7 +197,6 @@ function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
   d.meshes.forEach((m,i)=>{
     m.visible = visibleByState(d, isOn, m);
-    // Precíz állás
     const isOnMesh  = (d.invert ? d.offGroup : d.onGroup).has(m);
     const isOffMesh = (d.invert ? d.onGroup : d.offGroup).has(m);
     if(isOnMesh)  m.rotation.z = d.baseZ[i];
@@ -225,6 +230,7 @@ function applyCombo(){
 ['selEV','selAV','selL1','selL12'].forEach(id=> document.getElementById(id).addEventListener('change', applyCombo));
 document.getElementById('btnApply').onclick = applyCombo;
 
+// Debug UI: swap groups, solo, pick-to-add
 function refreshDebugList(){
   const ul = document.getElementById('meshList');
   ul.innerHTML='';
@@ -237,33 +243,58 @@ function refreshDebugList(){
     ul.appendChild(li);
   });
 }
-
 document.getElementById('selDipIdx').addEventListener('change', refreshDebugList);
 
 document.getElementById('btnSwapOne').onclick = ()=>{
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
-  d.invert = !d.invert;
-  setDip(idx, d.on);
-  refreshDebugList();
+  d.invert = !d.invert; setDip(idx, d.on); refreshDebugList();
   hud.textContent = `Dip-${idx}: ON/OFF csoport csere: ${d.invert?'INVERTED':'NORMAL'}`;
 };
-
 document.getElementById('btnSwapAll').onclick = ()=>{
   dips.forEach((d,idx)=>{ d.invert = !d.invert; setDip(idx, d.on); });
   refreshDebugList();
   hud.textContent = 'Mind a 8 DIP: ON/OFF csoport csere végrehajtva.';
 };
-
 document.getElementById('btnSolo').onclick = ()=>{
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
   const keep = new Set(d.meshes.map(x=>x.id));
   root.traverse(n=>{ if(n.isMesh) n.visible = keep.has(n.id); });
 };
-document.getElementById('btnUnsolo').onclick = ()=>{
-  root.traverse(n=>{ if(n.isMesh) n.visible = true; });
-};
+document.getElementById('btnUnsolo').onclick = ()=>{ root.traverse(n=>{ if(n.isMesh) n.visible = true; }); };
+
+// Picking
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let pickMode = null; // 'on' | 'off' | null
+function setPickMode(mode){
+  pickMode = mode;
+  renderer.domElement.classList.toggle('pick', !!mode);
+  hud.textContent = mode ? `Kattints egy mesh-re, hozzáadás: ${mode.toUpperCase()}` : 'Kijelölés mód KI';
+}
+document.getElementById('btnPickOn').onclick = ()=> setPickMode('on');
+document.getElementById('btnPickOff').onclick = ()=> setPickMode('off');
+document.getElementById('btnPickCancel').onclick = ()=> setPickMode(null);
+
+renderer.domElement.addEventListener('pointerdown', (e)=>{
+  if(!pickMode) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left)/rect.width)*2 - 1;
+  mouse.y = -((e.clientY - rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(root, true);
+  if(intersects.length === 0) return;
+  const mesh = intersects[0].object;
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  if(!d.meshes.includes(mesh)){ d.meshes.push(mesh); d.baseZ.push(mesh.rotation.z); }
+  if(pickMode === 'on'){ d.onGroup.add(mesh); d.offGroup.delete(mesh); }
+  if(pickMode === 'off'){ d.offGroup.add(mesh); d.onGroup.delete(mesh); }
+  setDip(idx, d.on);
+  refreshDebugList();
+  hud.textContent = `Dip-${idx}: hozzáadva → ${pickMode.toUpperCase()} : ${mesh.name || mesh.parent?.name || mesh.type}`;
+}, false);
 
 document.getElementById('btnHoriz').onclick = ()=>{ if(root){ root.rotation.x = -Math.PI/2; } };
 document.getElementById('btnUpright').onclick = ()=>{ if(root){ root.rotation.x = 0; } };
