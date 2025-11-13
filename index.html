@@ -142,15 +142,35 @@ function setupAfterLoad(){
   root.rotation.x = -Math.PI/2;
   const info=[];
   
+
 root.traverse(n=>{
     const nm = normName(n.name);
-    // Szellem alsó DIP-karok elrejtése: minden Volumenkörper1.104 mesh legyen láthatatlan
-    if(n.isMesh && nm.includes('volumenkörper1.104')){
-      n.visible = false;
+
+    const m = nm.match(/^dip[-_]?([1-8])$/i);
+    if(m){
+      const idx = parseInt(m[1],10);
+      const parts = collectMeshes(n);
+      if(!parts.length) return;
+
+      // Kétféle mesh: a Volumenkörper1.104 nevűek (valódi mozgó karok),
+      // és minden más, ami "szellemként" lent marad. Csak az előbbiek maradjanak láthatók.
+      const leverMeshes = [];
+      const ghostMeshes = [];
+      for(const p of parts){
+        const pn = normName(p.name);
+        if(pn.includes('volumenkörper1.104')) leverMeshes.push(p);
+        else ghostMeshes.push(p);
+      }
+      if(leverMeshes.length){
+        ghostMeshes.forEach(g=> g.visible = false);
+      }
+      const keep = leverMeshes.length ? leverMeshes : parts;
+
+      const baseZ = keep.map(p=>p.rotation.z);
+      dips.set(idx,{parts:keep, baseZ, on:true});
       return;
     }
-
-    const m = nm.match(/^dip[-_]?(\d)$/i);
+const m = nm.match(/^dip[-_]?(\d)$/i);
     if(m){
       const idx = parseInt(m[1],10);
       const parts = collectMeshes(n);
