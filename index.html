@@ -141,32 +141,22 @@ function setupAfterLoad(){
   dips.clear();
   root.rotation.x = -Math.PI/2;
   const info=[];
-  
-root.traverse(n=>{
+  root.traverse(n=>{
     const nm = normName(n.name);
-    const m = nm.match(/^dip[-_]?([1-8])$/i);
-    if(!m) return;
-    const idx = parseInt(m[1],10);
-    const parts = collectMeshes(n);
-    if(!parts.length) return;
-
-    // A GLB-ben minden DIP alatt kétféle mesh van:
-    //  - Volumenkörper1.104: alsó fix sor (zöld alapon ülő rész)
-    //  - minden más: a tényleges mozgó kar
-    const leverMeshes = [];
-    const ghostMeshes = [];
-    for(const p of parts){
-      const pn = normName(p.name);
-      if(pn.includes('volumenkörper1.104')) ghostMeshes.push(p);
-      else leverMeshes.push(p);
+    const m = nm.match(/^dip[-_]?(\d)$/i);
+    if(m){
+      const idx = parseInt(m[1],10);
+      const parts = collectMeshes(n);
+      const baseZ = parts.map(p=>p.rotation.z);
+      // Két klaszter a baseZ alapján
+      const minZ = Math.min(...baseZ), maxZ = Math.max(...baseZ);
+      const mid = (minZ + maxZ)/2;
+      const onGroup = new Set();   // ~35° körüli
+      const offGroup = new Set();  // ~0° körüli
+      parts.forEach((p,i)=>{ (baseZ[i] >= mid ? onGroup : offGroup).add(p); });
+      dips.set(idx, {group:n, meshes:parts, baseZ, onGroup, offGroup, on:true});
+      info.push(`Dip-${idx}: ${parts.length} mesh | ON: ${onGroup.size}, OFF: ${offGroup.size}`);
     }
-    if(ghostMeshes.length){
-      ghostMeshes.forEach(g=> g.visible = false); // szellemek eltüntetése
-    }
-    const keep = leverMeshes.length ? leverMeshes : parts;
-    const baseZ = keep.map(p=>p.rotation.z);
-    dips.set(idx, {group:n, meshes:keep, baseZ, on:true});
-    info.push(`Dip-${idx}: ${keep.length} aktív mesh, ghost: ${ghostMeshes.length}`);
   });
   // fit view
   const box = new THREE.Box3().setFromObject(root);
@@ -193,16 +183,18 @@ root.traverse(n=>{
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
-
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
   d.meshes.forEach((m,i)=>{
-    m.visible = true; // mindig ugyanaz a kar látszik
-    m.rotation.z = d.baseZ[i] + (isOn ? 0 : -ON_RAD);
+    const inOn  = d.onGroup.has(m);
+    const inOff = d.offGroup.has(m);
+    m.visible = isOn ? inOn : inOff;
+    // Precíz állás
+    if(inOn)  m.rotation.z = d.baseZ[i];
+    if(inOff) m.rotation.z = d.baseZ[i] - ON_RAD;
     m.updateMatrixWorld(true);
   });
   d.on = isOn;
-}
 }
 
 // Mapping
