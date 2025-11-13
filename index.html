@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir‑EC — Three.js (Netlify v6, Dupla‑kar fix)</title>
+  <title>SimplAir‑EC — Three.js (Netlify v7, Swap ON/OFF)</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{height:100%;margin:0;background:#0b0e14;color:var(--text);font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow:hidden}
@@ -27,7 +27,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v6 • Dupla‑kar fix</span>
+    <h1>SimplAir‑EC — Three.js</h1><span style="opacity:.7">Netlify v7 • ON/OFF csere</span>
   </header>
   <div id="viewer">
     <div id="hud">Betöltés…</div>
@@ -58,9 +58,10 @@
       <div class="row">
         <label>DIP debug</label>
         <select id="selDipIdx"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
+        <button id="btnSwapOne">Csoport csere (kijelölt)</button>
+        <button id="btnSwapAll">Csoport csere (mind)</button>
         <button id="btnSolo">Csak ez látszódjon</button>
         <button id="btnUnsolo">Összes vissza</button>
-        <button id="btnBlink">Villogtasd a kijelölt DIP‑et</button>
       </div>
       <div id="meshListWrap">
         <div style="opacity:.7">Állapot szerinti besorolás ezen a DIP-en:</div>
@@ -113,8 +114,7 @@ const candidates = [
 ];
 
 let root=null;
-// idx -> {group, meshes:[mesh...], baseZ:[...], onGroup:Set, offGroup:Set, on:true}
-let dips=new Map();
+let dips=new Map(); // idx -> {group, meshes:[mesh...], baseZ:[...], onGroup:Set, offGroup:Set, invert:boolean, on:true}
 const ON_RAD = Math.PI*35/180;
 
 function normName(n){ return (n||'').toLowerCase().replace(/[\s \u00A0]+/g,''); }
@@ -148,13 +148,11 @@ function setupAfterLoad(){
       const idx = parseInt(m[1],10);
       const parts = collectMeshes(n);
       const baseZ = parts.map(p=>p.rotation.z);
-      // Két klaszter a baseZ alapján
       const minZ = Math.min(...baseZ), maxZ = Math.max(...baseZ);
       const mid = (minZ + maxZ)/2;
-      const onGroup = new Set();   // ~35° körüli
-      const offGroup = new Set();  // ~0° körüli
+      const onGroup = new Set(), offGroup = new Set();
       parts.forEach((p,i)=>{ (baseZ[i] >= mid ? onGroup : offGroup).add(p); });
-      dips.set(idx, {group:n, meshes:parts, baseZ, onGroup, offGroup, on:true});
+      dips.set(idx, {group:n, meshes:parts, baseZ, onGroup, offGroup, invert:false, on:true});
       info.push(`Dip-${idx}: ${parts.length} mesh | ON: ${onGroup.size}, OFF: ${offGroup.size}`);
     }
   });
@@ -168,12 +166,12 @@ function setupAfterLoad(){
   camera.position.copy(center.clone().add(new THREE.Vector3(dist, dist*0.6, dist)));
   controls.update();
   hud.textContent = `Betöltve.\n${info.join('\\n')}`;
-  // Alaphelyzet: csak az ON csoport látszik
+  // Alaphelyzet: ON csoport látszik
   dips.forEach(d=>{
     d.meshes.forEach((m,i)=>{
       const isOnMesh  = d.onGroup.has(m);
       const isOffMesh = d.offGroup.has(m);
-      m.visible = isOnMesh; // csak ON
+      m.visible = isOnMesh;
       if(isOnMesh) m.rotation.z = d.baseZ[i];
       if(isOffMesh) m.rotation.z = d.baseZ[i] - ON_RAD;
     });
@@ -183,40 +181,35 @@ function setupAfterLoad(){
 
 function fail(message){ err.style.display='block'; err.textContent = message; }
 
+function visibleByState(d, isOn, m){
+  const onSets = d.invert ? d.offGroup : d.onGroup;
+  const offSets = d.invert ? d.onGroup : d.offGroup;
+  return isOn ? onSets.has(m) : offSets.has(m);
+}
+
 function setDip(idx, isOn){
   const d = dips.get(idx); if(!d) return;
   d.meshes.forEach((m,i)=>{
-    const inOn  = d.onGroup.has(m);
-    const inOff = d.offGroup.has(m);
-    m.visible = isOn ? inOn : inOff;
+    m.visible = visibleByState(d, isOn, m);
     // Precíz állás
-    if(inOn)  m.rotation.z = d.baseZ[i];
-    if(inOff) m.rotation.z = d.baseZ[i] - ON_RAD;
+    const isOnMesh  = (d.invert ? d.offGroup : d.onGroup).has(m);
+    const isOffMesh = (d.invert ? d.onGroup : d.offGroup).has(m);
+    if(isOnMesh)  m.rotation.z = d.baseZ[i];
+    if(isOffMesh) m.rotation.z = d.baseZ[i] - ON_RAD;
     m.updateMatrixWorld(true);
   });
   d.on = isOn;
 }
 
-// Mapping
 function compute(evv,avv,l1,l12){
   let S1=false,S2=false;
-  if(evv===1){ /*00*/ }
-  else if(evv===0){ S2=true }
-  else if(evv===3){ S1=true }
-  else if(evv===6){ S1=true; S2=true }
-
+  if(evv===1){ /*00*/ } else if(evv===0){ S2=true } else if(evv===3){ S1=true } else if(evv===6){ S1=true; S2=true }
   let S3=false,S4=false;
-  if(avv===15){ /*00*/ }
-  else if(avv===0){ S4=true }
-  else if(avv===6){ S3=true }
-  else if(avv===10){ S3=true; S4=true }
-
+  if(avv===15){ /*00*/ } else if(avv===0){ S4=true } else if(avv===6){ S3=true } else if(avv===10){ S3=true; S4=true }
   let S5=false,S6=false;
   if(l1===30){ /*00*/ } else if(l1===20){ S6=true } else if(l1===40){ S5=true } else if(l1===100){ S5=true; S6=true }
-
   let S7=false,S8=false;
   if(l12===60){ /*00*/ } else if(l12===30){ S8=true } else if(l12===80){ S7=true } else if(l12===100){ S7=true; S8=true }
-
   return [S1,S2,S3,S4,S5,S6,S7,S8];
 }
 
@@ -232,20 +225,35 @@ function applyCombo(){
 ['selEV','selAV','selL1','selL12'].forEach(id=> document.getElementById(id).addEventListener('change', applyCombo));
 document.getElementById('btnApply').onclick = applyCombo;
 
-// Debug helpers
 function refreshDebugList(){
   const ul = document.getElementById('meshList');
   ul.innerHTML='';
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
   const d = dips.get(idx); if(!d) return;
   d.meshes.forEach((m,i)=>{
-    const tag = d.onGroup.has(m) ? '[ON]' : (d.offGroup.has(m) ? '[OFF]' : '[?]');
+    const tag = (d.invert ? d.offGroup : d.onGroup).has(m) ? '[ON]' : '[OFF]';
     const li=document.createElement('li');
     li.textContent = `${tag} ${m.name || m.parent?.name || m.type}`;
     ul.appendChild(li);
   });
 }
+
 document.getElementById('selDipIdx').addEventListener('change', refreshDebugList);
+
+document.getElementById('btnSwapOne').onclick = ()=>{
+  const idx = parseInt(document.getElementById('selDipIdx').value,10);
+  const d = dips.get(idx); if(!d) return;
+  d.invert = !d.invert;
+  setDip(idx, d.on);
+  refreshDebugList();
+  hud.textContent = `Dip-${idx}: ON/OFF csoport csere: ${d.invert?'INVERTED':'NORMAL'}`;
+};
+
+document.getElementById('btnSwapAll').onclick = ()=>{
+  dips.forEach((d,idx)=>{ d.invert = !d.invert; setDip(idx, d.on); });
+  refreshDebugList();
+  hud.textContent = 'Mind a 8 DIP: ON/OFF csoport csere végrehajtva.';
+};
 
 document.getElementById('btnSolo').onclick = ()=>{
   const idx = parseInt(document.getElementById('selDipIdx').value,10);
@@ -255,16 +263,6 @@ document.getElementById('btnSolo').onclick = ()=>{
 };
 document.getElementById('btnUnsolo').onclick = ()=>{
   root.traverse(n=>{ if(n.isMesh) n.visible = true; });
-};
-
-document.getElementById('btnBlink').onclick = async ()=>{
-  const idx = parseInt(document.getElementById('selDipIdx').value,10);
-  const d = dips.get(idx); if(!d) return;
-  for(let k=0;k<4;k++){
-    d.meshes.forEach(m=> m.visible = !m.visible);
-    await new Promise(r=> setTimeout(r, 220));
-  }
-  applyCombo();
 };
 
 document.getElementById('btnHoriz').onclick = ()=>{ if(root){ root.rotation.x = -Math.PI/2; } };
