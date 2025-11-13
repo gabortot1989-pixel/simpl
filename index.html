@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="hu">
+<html lang="de">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SimplAir-EC — Three.js (v5 + végleges DIP-fix)</title>
+  <title>SimplAir-EC Dip-Schalter Simulator</title>
   <style>
     :root{ --bg:#0b0e14; --text:#e6e9ef}
     html,body{
@@ -111,15 +111,15 @@
 <body>
 <div id="app">
   <header>
-    <h1>SimplAir-EC – DIP demó</h1>
-    <span style="font-size:12px;opacity:.75">v5 + végleges ghost-fix</span>
+    <h1>SimplAir-EC Dip-Schalter Simulator</h1>
+    <span style="font-size:12px;opacity:.75">Web-Demo</span>
   </header>
 
   <div id="viewer">
-    <div id="hud">Betöltés…</div>
+    <div id="hud">Ladevorgang…</div>
     <footer>
-      EV / AV / L1 / L1+L2 → DIP-kombináció<br>
-      DIP debug → egyes DIP kar tesztelése
+      EV / AV / L1 / L1+L2 → DIP-Kombination<br>
+      DIP-Debug → einzelne Schalter testen
     </footer>
   </div>
 
@@ -159,27 +159,27 @@
         </select>
       </div>
       <div class="row">
-        <button id="btnApply">Kombináció alkalmazása</button>
-        <button id="btnHoriz">Vízszintes</button>
-        <button id="btnUpright">Álló</button>
-        <button id="btnFocusDip">Fókusz DIP</button>
+        <button id="btnApply">Kombination anwenden</button>
+        <button id="btnHoriz">Waagerecht</button>
+        <button id="btnUpright">Aufrecht</button>
+        <button id="btnFocusDip">Auf DIP fokussieren</button>
       </div>
     </div>
 
     <div class="group">
       <div class="row">
-        <label>DIP debug</label>
+        <label>DIP-Debug</label>
         <select id="selDipDbg">
           <option>1</option><option>2</option><option>3</option><option>4</option>
           <option>5</option><option>6</option><option>7</option><option>8</option>
         </select>
-        <button id="btnTest">Teszt Dip-1 ON/OFF</button>
+        <button id="btnTest">Test DIP-1 EIN/AUS</button>
       </div>
       <div class="row">
-        <button id="btnGhostFix">Ghost-fix e DIP körül</button>
-        <button id="btnSoloDip">Csak ez látszódjon</button>
-        <button id="btnUnsolo">Összes vissza</button>
-        <button id="btnBlink">Villogtasd a rotáltakat</button>
+        <button id="btnGhostFix">Mesh-Liste für DIP anzeigen</button>
+        <button id="btnSoloDip">Nur dieser sichtbar</button>
+        <button id="btnUnsolo">Alle wieder einblenden</button>
+        <button id="btnBlink">Rotierte Schalter blinken</button>
       </div>
       <ul id="debugList"></ul>
     </div>
@@ -236,7 +236,7 @@ animate();
 const loader = new GLTFLoader();
 const ON_RAD = Math.PI * 35 / 180;
 
-// DIP állapot: idx -> { meshes:[], baseZ:[], on:bool }
+// DIP-Zustand: idx -> { meshes:[], baseZ:[], on:bool }
 const dips = new Map();
 const dipGroups = new Map(); // idx -> parent group
 
@@ -254,12 +254,12 @@ loader.load(
     const root = gltf.scene;
     scene.add(root);
 
-    // alapból vízszintesre forgatjuk
+    // Standardansicht: waagerecht
     root.rotation.x = -Math.PI / 2;
 
     const info = [];
 
-    // *** DIP-ek felépítése + GHOST FIX NÉV ALAPJÁN ***
+    // *** DIP-Gruppen aufbauen ***
     root.traverse(n=>{
       const nm = normName(n.name);
       const m = nm.match(/^dip[-_]?([1-8])$/i);
@@ -276,24 +276,23 @@ loader.load(
 
       for(const p of parts){
         const pn = normName(p.name);
-        // A mozgó kar neve: Volumenkörper1.104  → EZEKEKET tartjuk meg
+        // Bewegliche Schalterarme heißen Volumenkörper1.104 → behalten
         if(pn.includes("volumenkörper1.104")) leverMeshes.push(p);
-        else ghosts.push(p); // minden más a fix / szellem rész
+        else ghosts.push(p); // Rest = feste Teile / „Geister“
       }
 
-      // ha valamiért nem találjuk a volumenkörper1.104-et, fallback az összesre
       const keep = leverMeshes.length ? leverMeshes : parts;
 
-      // GHOST ELREJTÉSE: csak a mozgó karok maradjanak
+      // Feste Geister-Meshes ausblenden, nur die beweglichen bleiben
       ghosts.forEach(g => { if(!keep.includes(g)) g.visible = false; });
 
       const baseZ = keep.map(m=>m.rotation.z);
       dips.set(idx,{meshes:keep, baseZ, on:true});
 
-      info.push(`Dip-${idx}: keep=${keep.length}, ghost=${ghosts.length}`);
+      info.push(`DIP-${idx}: aktive Meshes=${keep.length}, ausgeblendet=${ghosts.length}`);
     });
 
-    // fit view
+    // Ansicht einpassen
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3()).length();
     const center = box.getCenter(new THREE.Vector3());
@@ -305,20 +304,20 @@ loader.load(
     );
     camera.updateProjectionMatrix();
 
-    hud.textContent = "Betöltve.\n" + info.join("\n");
+    hud.textContent = "Geladen.\n" + info.join("\n");
 
-    applyCombo(); // induló kombináció
+    applyCombo(); // Startkombination
   },
   xhr => {
     if (xhr.total) {
-      hud.textContent = "Betöltés: " + (xhr.loaded / xhr.total * 100).toFixed(0) + "%";
+      hud.textContent = "Ladevorgang: " + (xhr.loaded / xhr.total * 100).toFixed(0) + " %";
     } else {
-      hud.textContent = "Betöltés: " + xhr.loaded + " B";
+      hud.textContent = "Ladevorgang: " + xhr.loaded + " B";
     }
   },
   err => {
     console.error(err);
-    hud.textContent = "Hiba a GLB betöltésekor.";
+    hud.textContent = "Fehler beim Laden der GLB-Datei.";
   }
 );
 
@@ -360,10 +359,10 @@ function applyCombo(){
   for(let i=0;i<8;i++) setDip(i+1, st[i]);
   hud.textContent =
     `EV:${evv}  AV:${avv}  L1:${l1}  L1+L2:${l12}\n`+
-    `DIP-ek: ${st.map(x=>x?"ON":"OFF").join(" ")}`;
+    `DIP-Status: ${st.map(x=>x?"EIN":"AUS").join(" ")}`;
 }
 
-// UI események
+// UI-Ereignisse
 document.getElementById("btnApply").onclick = applyCombo;
 ["selEV","selAV","selL1","selL12"].forEach(id=>{
   document.getElementById(id).addEventListener("change", applyCombo);
@@ -397,7 +396,7 @@ document.getElementById("btnGhostFix").onclick = ()=>{
   debugList.innerHTML = "";
   dips.forEach((d,idx)=>{
     const li = document.createElement("li");
-    li.textContent = `Dip-${idx}: meshes=${d.meshes.length}`;
+    li.textContent = `DIP-${idx}: Meshes=${d.meshes.length}`;
     debugList.appendChild(li);
   });
 };
