@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login – SimplAir-EC Simulator</title>
+  <style>
+    body{
+      margin:0;
+      background:#0b0e14;
+      color:#e6e9ef;
+      font-family:Segoe UI,Roboto,Arial;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100vh;
+    }
+    .card{
+      background:#111827;
+      padding:20px 25px;
+      border:1px solid #1f2937;
+      border-radius:12px;
+      width:260px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      text-align:center;
+    }
+    input{
+      width:100%;
+      padding:8px;
+      border-radius:8px;
+      background:#020617;
+      border:1px solid #374151;
+      color:#fff;
+    }
+    button{
+      width:100%;
+      padding:8px;
+      border-radius:8px;
+      background:#3b82f6;
+      border:none;
+      color:#fff;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    button:hover{ background:#2563eb; }
+    .error{ color:#f87171; font-size:12px; min-height:14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Login</h2>
+    <p>Bitte Passwort eingeben</p>
+    <input id="pw" type="password" placeholder="Passwort" />
+    <button onclick="login()">Login</button>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    const CORRECT = "meltem2025"; // <<< ugyanaz a jelszó mint middleware-ben
+
+    function login(){
+      const pw = document.getElementById("pw").value;
+      if(pw === CORRECT){
+        document.cookie = "access_granted=true; path=/; max-age=86400"; // 1 day
+        window.location.href = "/";
+      } else {
+        document.getElementById("error").textContent = "Falsches Passwort.";
+      }
+    }
+  </script>
+</body>
+</html>
