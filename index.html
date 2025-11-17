@@ -98,16 +98,16 @@
       background:#111827cc;
       font-size:11px
     }
-    #meltemLogo {
-      position: fixed;
-      top: 110px;
-      right: 20px;
-      width: 350px;
-      height: auto;
-      opacity: 0.9;
-      z-index: 9999;
-      pointer-events: none; /* ne akadályozza a kameramozgást */
-    }
+#meltemLogo {
+  position: fixed;
+  top: 110px;
+  right: 20px;
+  width: 350px;
+  height: auto;
+  opacity: 0.9;
+  z-index: 9999;
+  pointer-events: none; /* ne akadályozza a kameramozgást */
+}
   </style>
 
   <script type="importmap">
@@ -120,7 +120,7 @@
 </head>
 <body>
 <div id="app">
-  <img src="logo.png" id="meltemLogo">
+<img src="logo.png" id="meltemLogo">
   <header>
     <h1 style="color:#859aa6">SimplAir-EC Dip-Schalter Simulator</h1>
     <span style="font-size:12px;opacity:.75"></span>
@@ -128,6 +128,7 @@
 
   <div id="viewer">
     <div id="hud">Ladevorgang…</div>
+
   </div>
 
   <div class="panel">
@@ -172,8 +173,8 @@
         <button id="btnFocusDip">Auf DIP fokussieren</button>
       </div>
     </div>
-  </div>
 
+   
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js";
@@ -181,6 +182,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.152.2/examples/jsm/loaders
 
 const viewer = document.getElementById("viewer");
 const hud = document.getElementById("hud");
+
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -208,11 +210,6 @@ camera.position.set(2.4, 1.8, 2.4);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// ⬇ ÚJ: óra + forgó rész referenciája
-const clock = new THREE.Clock();
-let rotor = null;
-// ⬆ ÚJ
-
 const hemi = new THREE.HemisphereLight(0xffffff, 0x2c353d, 0.6);
 scene.add(hemi);
 
@@ -234,13 +231,6 @@ window.addEventListener("resize", () => {
 
 function animate() {
   requestAnimationFrame(animate);
-
-  const delta = clock.getDelta();
-  if (rotor) {
-    // folyamatos forgás Y tengely körül
-    rotor.rotation.y += delta * 4 * Math.PI;
-  }
-
   controls.update();
   renderer.render(scene, camera);
 }
@@ -267,35 +257,28 @@ loader.load(
     const root = gltf.scene;
     scene.add(root);
 
-    // Anyagok finomhangolása
-    root.traverse(obj => {
-      if (obj.isMesh && obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach(m => {
-          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-            m.roughness = 0.35;        // 0 = tükör, 1 = nagyon matt
-            m.metalness = 0.1;         // kis „műszaki” csillogás
-            m.envMapIntensity = 1.2;   // erősebb fény-visszaverés
-          }
-        });
+// Anyagok finomhangolása
+root.traverse(obj => {
+  if (obj.isMesh && obj.material) {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(m => {
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        m.roughness = 0.35;        // 0 = tükör, 1 = nagyon matt
+        m.metalness = 0.1;         // kis „műszaki” csillogás
+        m.envMapIntensity = 1.2;   // erősebb fény-visszaverés
       }
     });
+  }
+});
 
     // Standardansicht: waagerecht
     root.rotation.x = -Math.PI / 2;
 
     const info = [];
 
-    // *** DIP-Gruppen aufbauen + rotor keresése ***
+    // *** DIP-Gruppen aufbauen ***
     root.traverse(n=>{
       const nm = normName(n.name);
-
-      // ⬇ ÚJ: forgó ventilátor rész felismerése
-      if (nm.includes("volumenkörper1.034")) {
-        rotor = n;
-      }
-      // ⬆ ÚJ
-
       const m = nm.match(/^dip[-_]?([1-8])$/i);
       if(!m) return;
 
