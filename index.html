@@ -9,7 +9,7 @@
     html,body{
       height:100%;
       margin:0;
-      background:#0b0e14;
+      background:#2c353d;
       color:var(--text);
       font:14px system-ui,Segoe UI,Roboto,Helvetica,Arial;
       overflow:hidden
@@ -98,6 +98,16 @@
       background:#111827cc;
       font-size:11px
     }
+#meltemLogo {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 800px;
+  height: auto;
+  opacity: 0.9;
+  z-index: 9999;
+  pointer-events: none; /* ne akadályozza a kameramozgást */
+}
   </style>
 
   <script type="importmap">
@@ -110,16 +120,15 @@
 </head>
 <body>
 <div id="app">
+<img src="logo.png" id="meltemLogo">
   <header>
-    <h1>SimplAir-EC Dip-Schalter Simulator</h1>
-    <span style="font-size:12px;opacity:.75">Web-Demo</span>
+    <h1 style="color:#859aa6">SimplAir-EC Dip-Schalter Simulator</h1>
+    <span style="font-size:12px;opacity:.75"></span>
   </header>
 
   <div id="viewer">
     <div id="hud">Ladevorgang…</div>
-    <footer>
-      EV / AV / L1 / L1+L2 → DIP-Kombination<br>
-    </footer>
+
   </div>
 
   <div class="panel">
