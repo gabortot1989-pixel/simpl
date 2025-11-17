@@ -187,7 +187,13 @@ const hud = document.getElementById("hud");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight - 140);
+
+// „Blenderesebb” tónusgörbe és fénykezelés
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.physicallyCorrectLights = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;  // ha túl világos / sötét, ezen tudsz állítani
+
 viewer.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -204,10 +210,18 @@ camera.position.set(2.4, 1.8, 2.4);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-dir.position.set(4, 5, 6);
-scene.add(dir);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x2c353d, 0.6);
+scene.add(hemi);
+
+// Főfény (key light) elölről-felülről
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.4);
+keyLight.position.set(4, 6, 8);
+scene.add(keyLight);
+
+// Peremfény (rim light) hátulról, hogy szépen kirajzolja az éleket
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.6);
+rimLight.position.set(-4, 2, -4);
+scene.add(rimLight);
 
 window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight - 140);
@@ -242,6 +256,20 @@ loader.load(
   gltf => {
     const root = gltf.scene;
     scene.add(root);
+
+// Anyagok finomhangolása
+root.traverse(obj => {
+  if (obj.isMesh && obj.material) {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(m => {
+      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+        m.roughness = 0.35;        // 0 = tükör, 1 = nagyon matt
+        m.metalness = 0.1;         // kis „műszaki” csillogás
+        m.envMapIntensity = 1.2;   // erősebb fény-visszaverés
+      }
+    });
+  }
+});
 
     // Standardansicht: waagerecht
     root.rotation.x = -Math.PI / 2;
