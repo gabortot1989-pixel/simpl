@@ -394,15 +394,42 @@ document.getElementById("btnUpright").onclick = ()=>{
   if(root) root.rotation.x = 0;
 };
 
-document.getElementById("btnFocusDip").onclick = ()=>{
-  const idx = parseInt(document.getElementById("selDipDbg").value,10);
-  const g = dipGroups.get(idx);
-  if(!g) return;
-  const box = new THREE.Box3().setFromObject(g);
-  const c = box.getCenter(new THREE.Vector3());
-  controls.target.copy(c);
-};
+document.getElementById("btnFocusDip").onclick = () => {
+  // Összes DIP-csoportból csinálunk egy közös bounding boxot
+  const box = new THREE.Box3();
+  const tmp = new THREE.Box3();
+  let hasAny = false;
 
+  for (const g of dipGroups.values()) {
+    if (!g) continue;
+    tmp.setFromObject(g);
+    if (!hasAny) {
+      box.copy(tmp);
+      hasAny = true;
+    } else {
+      box.union(tmp);
+    }
+  }
+
+  if (!hasAny) return;
+
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+
+  // Kameracélpont a DIP közepére
+  controls.target.copy(center);
+
+  // Kamera kicsit odébb, hogy szépen rálásson
+  const dir = new THREE.Vector3()
+    .subVectors(camera.position, center)
+    .normalize();
+
+  camera.position.copy(
+    center.clone().add(dir.multiplyScalar(size * 1.5))
+  );
+
+  camera.updateProjectionMatrix();
+};
 </script>
 </body>
 </html>
