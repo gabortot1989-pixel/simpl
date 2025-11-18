@@ -98,16 +98,58 @@
       background:#111827cc;
       font-size:11px
     }
-#meltemLogo {
-  position: fixed;
-  top: 110px;
-  right: 20px;
-  width: 150px;
-  height: auto;
-  opacity: 0.9;
-  z-index: 9999;
-  pointer-events: none; /* ne akadályozza a kameramozgást */
-}
+    #meltemLogo {
+      position: fixed;
+      top: 110px;
+      right: 20px;
+      width: 150px;
+      height: auto;
+      opacity: 0.9;
+      z-index: 9999;
+      pointer-events: none; /* ne akadályozza a kameramozgást */
+    }
+
+    /* --- Info popup doboz --- */
+    #infoBox{
+      position:fixed;
+      left:12px;
+      bottom:80px; /* a panel fölé kerül szépen */
+      max-width:260px;
+      background:#111827ee;
+      border-radius:10px;
+      border:1px solid #1f2937;
+      padding:10px 12px;
+      font-size:11px;
+      line-height:1.4;
+      box-shadow:0 12px 30px #00000080;
+      opacity:0;
+      transform:translateY(8px);
+      pointer-events:none;
+      transition:opacity .18s ease, transform .18s ease;
+      z-index:1000;
+    }
+    #infoBox.visible{
+      opacity:1;
+      transform:translateY(0);
+      pointer-events:auto;
+    }
+    #infoBox h2{
+      margin:0 0 6px 0;
+      font-size:12px;
+      font-weight:600;
+      color:#e5e7eb;
+    }
+    #infoBox dl{
+      margin:0;
+    }
+    #infoBox dt{
+      font-weight:600;
+      margin-top:4px;
+    }
+    #infoBox dd{
+      margin:0 0 2px 0;
+      opacity:.85;
+    }
   </style>
 
   <script type="importmap">
@@ -120,7 +162,7 @@
 </head>
 <body>
 <div id="app">
-<img src="logo.png" id="meltemLogo">
+  <img src="logo.png" id="meltemLogo">
   <header>
     <h1 style="color:#859aa6">SimplAir-EC Dip-Schalter Simulator</h1>
     <span style="font-size:12px;opacity:.75"></span>
@@ -128,7 +170,6 @@
 
   <div id="viewer">
     <div id="hud">Ladevorgang…</div>
-
   </div>
 
   <div class="panel">
@@ -171,10 +212,33 @@
         <button id="btnHoriz">Waagerecht</button>
         <button id="btnUpright">Aufrecht</button>
         <button id="btnFocusDip">Auf DIP fokussieren</button>
+        <!-- Új Info gomb -->
+        <button id="btnInfo">Info</button>
       </div>
     </div>
+  </div>
 
-   
+  <!-- Felugró Info doboz a rövidítésekhez -->
+  <div id="infoBox">
+    <h2>Abkürzungen</h2>
+    <dl>
+      <dt>EV</dt>
+      <dd>Einschaltverzögerung in min</dd>
+
+      <dt>AV</dt>
+      <dd>Nachlaufzeit in min</dd>
+
+      <dt>L1</dt>
+      <dd>Steuereingang L1</dd>
+
+      <dt>L1 + L2</dt>
+      <dd>Steuereingang L1 und L2</dd>
+    </dl>
+    <p style="margin-top:6px;opacity:.75;">
+      Alle Zeiten sind in Minuten angegeben.
+    </p>
+  </div>
+
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js";
@@ -182,7 +246,29 @@ import { GLTFLoader } from "https://unpkg.com/three@0.152.2/examples/jsm/loaders
 
 const viewer = document.getElementById("viewer");
 const hud = document.getElementById("hud");
+const infoBox = document.getElementById("infoBox");
 
+// Info gomb logika
+const btnInfo = document.getElementById("btnInfo");
+btnInfo.addEventListener("click", (event) => {
+  event.stopPropagation(); // ne záródjon be azonnal a window click miatt
+  infoBox.classList.toggle("visible");
+});
+
+// Kattintás bárhová a doksiban → ha nyitva az info, bezárjuk
+window.addEventListener("click", (event) => {
+  if (!infoBox.classList.contains("visible")) return;
+  // ha az infoBox-on belül vagy az Info gombon kattintasz, ne záródjon
+  if (infoBox.contains(event.target) || event.target === btnInfo) return;
+  infoBox.classList.remove("visible");
+});
+
+// Esc gombbal is lehessen zárni
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && infoBox.classList.contains("visible")) {
+    infoBox.classList.remove("visible");
+  }
+});
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -257,19 +343,19 @@ loader.load(
     const root = gltf.scene;
     scene.add(root);
 
-// Anyagok finomhangolása
-root.traverse(obj => {
-  if (obj.isMesh && obj.material) {
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    mats.forEach(m => {
-      if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-        m.roughness = 0.35;        // 0 = tükör, 1 = nagyon matt
-        m.metalness = 0.1;         // kis „műszaki” csillogás
-        m.envMapIntensity = 1.2;   // erősebb fény-visszaverés
+    // Anyagok finomhangolása
+    root.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach(m => {
+          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+            m.roughness = 0.35;        // 0 = tükör, 1 = nagyon matt
+            m.metalness = 0.1;         // kis „műszaki” csillogás
+            m.envMapIntensity = 1.2;   // erősebb fény-visszaverés
+          }
+        });
       }
     });
-  }
-});
 
     // Standardansicht: waagerecht
     root.rotation.x = -Math.PI / 2;
